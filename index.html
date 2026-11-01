@@ -11434,9 +11434,7 @@ async function apriBotTelegram(){
     `<p style="font-size:13px;color:var(--gray);margin-bottom:10px;line-height:1.5">Password richiesta dal bot per salvare le presenze delle prove: ${cfg&&cfg.pwdHash?'<b>attualmente impostata</b>':'<b>non ancora impostata</b>'}. Lasciala vuota per non cambiarla.</p>
      <label class="lbl">Nuova password</label>
      <input class="inp" id="tg-pwd" type="password" autocomplete="new-password" placeholder="${cfg&&cfg.pwdHash?'(invariata)':'scegli una password'}" style="margin-bottom:12px">
-     <label class="lbl">Utenti autorizzati (uno per riga: ID Telegram = Nome)</label>
-     <textarea class="inp" id="tg-utenti" rows="6" style="font-family:monospace" placeholder="123456789 = Mario Rossi">${esc(righe)}</textarea>
-     <p style="font-size:12px;color:var(--gray);margin-top:6px">Chi scrive al bot senza essere in elenco riceve il proprio ID da copiare qui.</p>`,
+     <p style="font-size:12px;color:var(--gray);margin-top:6px;line-height:1.5">Chi può usare il bot e cosa può fare si decide da <b>Gestione utenti</b>: inserisci l'<b>ID Telegram</b> dentro ogni utente. Il bot rispetta gli stessi permessi dell'app (sezione nascosta = "Utente non abilitato"). Chi scrive al bot senza essere registrato riceve il proprio ID da comunicarti.</p>`,
     `<button class="btn-s" onclick="closeModal('modal-tg')">Chiudi</button><button class="btn-p" onclick="salvaBotTelegram()">💾 Salva</button>`);
   openModal('modal-tg');
 }
@@ -11445,11 +11443,7 @@ async function salvaBotTelegram(){
   try{
     await refreshTokenIfNeeded();
     const prec=await _tgLeggi()||{};
-    const utenti={};
-    (document.getElementById('tg-utenti').value||'').split('\n').forEach(r=>{
-      const m=r.match(/^\s*(\d{5,})\s*[=:,;]\s*(.+?)\s*$/);
-      if(m)utenti[m[1]]=m[2];
-    });
+    const utenti={}; // gli utenti del bot ora sono quelli dell'app (ID Telegram dentro ogni utente)
     const pwd=document.getElementById('tg-pwd').value;
     const out={versione:1,sale:prec.sale||'',pwdHash:prec.pwdHash||'',utenti,aggiornato:new Date().toISOString(),da:(utenteCorrente&&utenteCorrente.nome)||''};
     if(pwd){
@@ -11487,6 +11481,7 @@ function renderUtenti(){
           <div><label class="lbl">${nuovo?'Password (min. 8 caratteri)':'Nuova password (vuoto = invariata)'}</label><input class="inp" id="ut-pw" type="text" autocomplete="off"/></div>
           <div><label class="lbl">Ruolo</label><select class="inp" id="ut-ruolo" onchange="document.getElementById('ut-perm-box').style.display=this.value==='admin'?'none':''" ${ultimoAdmin?'disabled':''}><option value="utente" ${u.ruolo!=='admin'?'selected':''}>Utente (permessi per sezione)</option><option value="admin" ${u.ruolo==='admin'?'selected':''}>Amministratore (accesso totale)</option></select></div>
           <div><label class="lbl">Stato</label><select class="inp" id="ut-attivo" ${ultimoAdmin?'disabled':''}><option value="1" ${u.attivo!==false?'selected':''}>Attivo</option><option value="0" ${u.attivo===false?'selected':''}>Disattivato</option></select></div>
+          <div><label class="lbl">ID Telegram (per il bot)</label><input class="inp" id="ut-tg" value="${esc(u.telegramId||'')}" inputmode="numeric" placeholder="es. 566803941 (vuoto = niente bot)" autocomplete="off"/></div>
         </div>
         <div id="ut-perm-box" style="display:${u.ruolo==='admin'?'none':''}">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -11514,11 +11509,14 @@ async function salvaUtente(){
   if(!nome)return toast('Inserisci il nome utente','err');
   if(nuovo&&utentiDB.utenti.some(x=>x.nome.toLowerCase()===nome.toLowerCase()))return toast('Nome utente già esistente','err');
   if((nuovo||pw)&&pw.length<8)return toast('La password deve avere almeno 8 caratteri','err');
+  const tgEl=document.getElementById('ut-tg');const tgId=tgEl?tgEl.value.trim():'';
+  if(tgId&&!/^\d{5,}$/.test(tgId))return toast('L\'ID Telegram deve essere un numero (solo cifre)','err');
+  if(tgId&&utentiDB.utenti.some(x=>x.id!==_utEditId&&String(x.telegramId||'')===tgId))return toast('Questo ID Telegram è già assegnato a un altro utente','err');
   const permessi={};document.querySelectorAll('.ut-perm').forEach(s=>{if(s.value!=='none')permessi[s.dataset.sez]=s.value;});
   let u;
   if(nuovo){u={id:'u_'+_rnd(),nome};utentiDB.utenti.push(u);}
   else u=utentiDB.utenti.find(x=>x.id===_utEditId);
-  u.ruolo=ruoloEl.value;u.attivo=attEl.value!=='0';u.permessi=permessi;
+  u.ruolo=ruoloEl.value;u.attivo=attEl.value!=='0';u.permessi=permessi;u.telegramId=tgId;
   const impEl=document.getElementById('ut-imp');u.impostazioni=(u.ruolo==='admin'||!impEl)?'none':impEl.value;
   if(pw)await impostaPw(u,pw);
   u._mod=new Date().toISOString();
