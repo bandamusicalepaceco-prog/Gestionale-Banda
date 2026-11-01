@@ -2427,7 +2427,7 @@ async function loginGDrive(){
     +'&code_challenge_method=S256'
     +'&access_type=offline'
     +'&flowName=GeneralOAuthFlow'
-    +(localStorage.getItem('gdrive_had_token') ? '' : '&prompt=select_account');
+    +'&prompt=select_account%20consent';
   // Flusso Electron
   if(window.electron){
     if(window.electron.openOAuthChild)       window.electron.openOAuthChild(authUrl);
