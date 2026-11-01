@@ -349,6 +349,7 @@
   .btn-welcome-secondary:hover{border-color:var(--gold);color:var(--goldl);transform:translateY(-2px);}
 </style>
 <style>#btn-gdrive,#btn-carica-drive,#btn-salva-drive,#mob-btn-gdrive,#mob-btn-carica-drive,#mob-btn-salva-drive{display:none!important}</style>
+<style>#serv-tbody,#serv-tbody *,#serv-det-body,#serv-det-body *,#s-presenti-list,#s-presenti-list *{text-transform:uppercase}</style>
 </head>
 <body>
 
@@ -1496,6 +1497,9 @@ function toast(msg, tipo) {
         <div><label class="lbl">Strumento</label>
           <select class="inp" id="c-strumento"></select>
         </div>
+        <div><label class="lbl">Allievo</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:9px 0"><input type="checkbox" id="c-allievo" style="accent-color:var(--gold);width:16px;height:16px;cursor:pointer"/> È un allievo (nei servizi viene proposto come allievo)</label>
+        </div>
         <div><label class="lbl">Telefono</label><input class="inp" type="tel" id="c-tel"/></div>
         <div><label class="lbl">Email</label><input class="inp" type="email" id="c-email"/></div>
       </div>
@@ -1686,8 +1690,8 @@ function toast(msg, tipo) {
       <div class="sec-label">Dati Servizio</div>
       <div id="s-dati-grid" style="display:grid;grid-template-columns:60px 2fr 1fr 160px;gap:14px;margin-bottom:4px">
         <div><label class="lbl">N°</label><input class="inp" type="number" id="s-num" value="1" min="1"/></div>
-        <div><label class="lbl">Nome Servizio</label><input class="inp" id="s-nome" placeholder="es. Funerale Paceco"/></div>
-        <div><label class="lbl">Luogo</label><input class="inp" id="s-luogo" value="Paceco"/></div>
+        <div><label class="lbl">Nome Servizio</label><input oninput="this.value=this.value.toUpperCase()" class="inp" id="s-nome" placeholder="es. Funerale Paceco"/></div>
+        <div><label class="lbl">Luogo</label><input oninput="this.value=this.value.toUpperCase()" class="inp" id="s-luogo" value="Paceco"/></div>
         <div><label class="lbl">Importo (€)</label><input class="inp" type="number" id="s-importo" min="0" step="1" style="width:100%" oninput="aggiornaCalc()"/></div>
         <div style="grid-column:span 4"><label class="lbl">Date Servizio</label>
           <div id="s-date-container" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:6px 10px;min-height:36px;margin-bottom:6px"></div>
@@ -5521,7 +5525,7 @@ function renderComponenti(){
         <td style="font-weight:600">${esc(c.nome)}</td>
         <td>${fd(c.dataNascita)}</td>
         <td>${esc(c.luogoNascita||'—')}</td>
-        <td>${badge(c.strumento, c.strumento==='Direttore'?'red':'blue')}</td>
+        <td>${badge(c.strumento, c.strumento==='Direttore'?'red':'blue')}${c.allievo?' '+badge('🎓 Allievo','purple'):''}</td>
         <td class="wrap" style="font-size:11px;color:var(--gray)">${(()=>{
           const src = c.tutore || c;
           const vm = src.veicoloManuale;
@@ -5646,6 +5650,7 @@ function openCompForm(id){
   });
   document.getElementById('c-datanascita').value = c ? (c.dataNascita||'') : '';
   document.getElementById('c-strumento').value = c ? c.strumento : 'Clarinetto';
+  document.getElementById('c-allievo').checked = !!(c && c.allievo);
   document.getElementById('c-nome-doc').value = c ? (c.nomeDoc||'') : '';
   document.getElementById('c-iban').value = c ? (c.iban||'') : '';
   document.getElementById('c-banca').value = c ? (c.banca||'') : '';
@@ -5807,6 +5812,7 @@ function saveComponente(){
     comune: document.getElementById('c-comune').value,
     cap: document.getElementById('c-cap').value,
     strumento: document.getElementById('c-strumento').value,
+    allievo: !!(document.getElementById('c-allievo')||{}).checked,
     nomeDoc: document.getElementById('c-nome-doc').value.trim(),
     attivo: true,
     iban: document.getElementById('c-iban').value,
@@ -5945,8 +5951,8 @@ function openServForm(id){
   const sv = id ? (servizi[annoSel]||[]).find(s=>s.id===id) || Object.values(servizi).flat().find(s=>s.id===id) : null;
   document.getElementById('serv-form-title').innerHTML = `🎼 ${id?'Modifica':'Nuovo'} <span class="acc">Servizio</span>`;
   document.getElementById('s-num').value = sv ? sv.numProgressivo : ((servizi[annoSel]||[]).length+1);
-  document.getElementById('s-nome').value = sv ? sv.nome : '';
-  document.getElementById('s-luogo').value = sv ? sv.luogo : 'Paceco';
+  document.getElementById('s-nome').value = sv ? String(sv.nome||'').toUpperCase() : '';
+  document.getElementById('s-luogo').value = sv ? String(sv.luogo||'').toUpperCase() : 'PACECO';
   // Multi-date
   if(sv) {
     tempDate = sv.dateMultiple ? [...sv.dateMultiple] : (sv.data ? [sv.data] : []);
@@ -6067,7 +6073,7 @@ function togglePresente(cid){
   else {
     // di default presente a tutti i tipi
     const tipiIdx = tempTipi.map((_,i)=>i);
-    tempPresenti.push({componenteId:cid,allievo:false,tipiPresenti:tipiIdx});
+    tempPresenti.push({componenteId:cid,allievo:!!((getC(cid)||{}).allievo),tipiPresenti:tipiIdx});
   }
   renderPresentiForm(); aggiornaCalc();
 }
@@ -6091,7 +6097,7 @@ function aggiornaConsiglieri(){
   autosave();
 }
 
-function selTutti(){ const tipiIdx=tempTipi.map((_,i)=>i); tempPresenti=componenti.map(c=>({componenteId:c.id,allievo:false,tipiPresenti:[...tipiIdx]})); renderPresentiForm(); aggiornaCalc(); }
+function selTutti(){ const tipiIdx=tempTipi.map((_,i)=>i); tempPresenti=componenti.map(c=>({componenteId:c.id,allievo:!!c.allievo,tipiPresenti:[...tipiIdx]})); renderPresentiForm(); aggiornaCalc(); }
 function deselTutti(){ tempPresenti=[]; renderPresentiForm(); aggiornaCalc(); }
 
 function renderPresentiForm(){
@@ -6259,14 +6265,14 @@ function aggiornaCalc(){
 }
 
 function saveServizio(){
-  const nome=document.getElementById('s-nome').value.trim();
+  const nome=document.getElementById('s-nome').value.trim().toUpperCase();
   if(!nome||!tempDate.length) return toast('Nome e almeno una Data obbligatori', 'warn');
   const dateSorted=[...tempDate].sort();
   const data=dateSorted[0]; // primary date (first chronologically)
   const anno=Number(data.slice(0,4));
   const obj={
     numProgressivo:Number(document.getElementById('s-num').value)||1,
-    nome, data, dateMultiple:dateSorted, luogo:document.getElementById('s-luogo').value,
+    nome, data, dateMultiple:dateSorted, luogo:document.getElementById('s-luogo').value.trim().toUpperCase(),
     importo:Number(document.getElementById('s-importo').value||0),
     arrotonda:(document.getElementById('s-arrotonda')||{}).checked||false,
     cassaCustom:(document.getElementById('s-cassa-custom')||{}).checked||false,
