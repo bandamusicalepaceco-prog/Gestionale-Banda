@@ -636,7 +636,7 @@ function toast(msg, tipo) {
   <button data-solo-admin="1" onclick="apriFileJson();closeMobExtra()" style="padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#128194; Carica File JSON</button>
   <button id="mob-btn-salva-json" data-solo-admin="1" onclick="salvaDati();closeMobExtra()" style="display:none;padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#128190; Salva File JSON</button>
   <button data-solo-admin="1" onclick="openModal('modal-backup');closeMobExtra()" style="padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#128256; Backup / Ripristino</button>
-  <button data-solo-admin="1" onclick="apriImpostazioni();closeMobExtra()" style="padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#127912; Impostazioni</button>
+  <button onclick="apriImpostazioni();closeMobExtra()" style="padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#127912; Impostazioni</button>
   <div style="border-top:1px solid rgba(201,168,76,.2);margin:6px 0;"></div>
   <button id="mob-btn-gdrive" onclick="loginGDrive();closeMobExtra()" style="padding:12px 16px;border-radius:8px;border:1px solid rgba(66,133,244,.4);background:rgba(66,133,244,.12);color:#8ab4f8;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#128279; Google Drive: Connetti</button>
   <button id="mob-btn-carica-drive" onclick="caricaDaDrive();closeMobExtra()" style="display:none;padding:12px 16px;border-radius:8px;border:1px solid rgba(66,133,244,.4);background:rgba(66,133,244,.12);color:#8ab4f8;font-family:Lato,sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:left">&#128229; Carica da Drive</button>
@@ -2921,11 +2921,16 @@ async function driveUploadSectionFile(sezione, categoria, fileObj){
   }catch(e){}
 }
 
+// Chiave di accesso automatico (account Google dedicato alla banda): se compilata, il direttivo non vede la schermata di Google.
+var GDRIVE_AUTO_REFRESH_TOKEN = '';
 document.addEventListener('DOMContentLoaded', function(){
   const savedToken = localStorage.getItem('gDriveToken');
   if(savedToken){
     try{ gDriveToken = JSON.parse(savedToken); }catch(x){ gDriveToken = null; localStorage.removeItem('gDriveToken'); }
     if(gDriveToken && !gDriveToken.expires_at) gDriveToken.expires_at = 0; // forza il rinnovo
+  }
+  if(!gDriveToken && GDRIVE_AUTO_REFRESH_TOKEN && sessionStorage.getItem('auto_tok_fail')!=='1'){
+    gDriveToken = { refresh_token: GDRIVE_AUTO_REFRESH_TOKEN, expires_at: 0 };
   }
   aggiornaPulsanteGDrive(); // l'avvio vero (rinnovo, utenti, dati) è gestito dal modulo di accesso
 });
@@ -10996,6 +11001,9 @@ async function salvaSuDrive(silenzioso){
   }
 }
 
+// Chiave di accesso automatico (account Google dedicato alla banda): se compilata, nessuna schermata di accesso Google.
+// Si ottiene da Gestione utenti > "Chiave accesso automatico" dopo il primo collegamento.
+var GDRIVE_AUTO_REFRESH_TOKEN = '';
 
 </script>
 <!-- ═════════ LOGIN / UTENTI / PERMESSI ═════════ -->
@@ -11275,6 +11283,11 @@ function permessoSez(id){
   const p=utenteCorrente.ruolo==='admin'?'edit':((utenteCorrente.permessi&&utenteCorrente.permessi[id])||'none');
   return(p==='edit'&&!(haScrittura&&!_offline))?'view':p; // se un altro utente sta modificando, o manca Drive: sola lettura
 }
+function permessoImp(){
+  if(!utenteCorrente)return 'none';
+  const p=utenteCorrente.ruolo==='admin'?'edit':(utenteCorrente.impostazioni||'none');
+  return(p==='edit'&&!(haScrittura&&!_offline))?'view':p;
+}
 function puoVedereQualcosa(){return SEZIONI_APP.some(s=>permessoSez(s[0])!=='none');}
 function puoModificare(){return SEZIONI_APP.some(s=>permessoSez(s[0])==='edit');}
 
@@ -11303,7 +11316,8 @@ function applicaPermessi(mantieniTab){
   const btns=document.querySelectorAll('#header-nav .nav-btn');
   SEZIONI_APP.forEach((s,i)=>{_navSet(i,permessoSez(s[0])==='none'?'none':'');});
   const nascondi=(sel,hide)=>document.querySelectorAll(sel).forEach(e=>{e.style.display=hide?'none':'';});
-  nascondi('[data-solo-admin],button[onclick="apriFileJson()"],button[onclick="salvaDati()"],button[onclick="openModal(\'modal-backup\')"],button[onclick="apriImpostazioni()"]',!adm||!(haScrittura&&!_offline));
+  nascondi('[data-solo-admin],button[onclick="apriFileJson()"],button[onclick="salvaDati()"],button[onclick="openModal(\'modal-backup\')"]',!adm||!(haScrittura&&!_offline));
+  nascondi('button[onclick^="apriImpostazioni"]',permessoImp()==='none');
   const bu=document.getElementById('btn-utenti');if(bu)bu.style.display=adm?'':'none';
   ['btn-mia-pw','btn-esci'].forEach(i=>{const e=document.getElementById(i);if(e)e.style.display='';});
   aggiornaPulsanteGDrive();
@@ -11470,6 +11484,7 @@ setInterval(ritentaInSospeso,5000);
 /* Se la sessione Google non è più valida si torna alla schermata Sincronizza (solo password amministratore) */
 const _forzaLogoutOrig=_forzaLogoutDrive;
 window._forzaLogoutDrive=function(motivo){
+  try{sessionStorage.setItem('auto_tok_fail','1');}catch(e){}
   _forzaLogoutOrig(motivo);
   rilasciaLock();
   utenteCorrente=null;
@@ -11477,6 +11492,20 @@ window._forzaLogoutDrive=function(motivo){
   applicaSolaLettura();aggiornaChipUtente();
   mostraLogin('Autorizzazione Google scaduta: inserisci la password amministratore e premi Sincronizza.');
 };
+
+/* ── Impostazioni: nascoste / sola lettura / modifica, scelte dall'amministratore per ogni utente ── */
+const _apriImpOrig=apriImpostazioni;
+window.apriImpostazioni=function(){
+  if(permessoImp()==='none')return toast('Le impostazioni non sono disponibili per il tuo utente','warn');
+  _apriImpOrig();
+  const m=document.getElementById('modal-settings');if(!m)return;
+  const ro=permessoImp()!=='edit';
+  const corpo=m.querySelector('.modal-body');
+  if(corpo){if(ro)corpo.setAttribute('inert','');else corpo.removeAttribute('inert');corpo.style.opacity=ro?'.8':'';}
+  m.querySelectorAll('.form-act button').forEach(b=>{const oc=b.getAttribute('onclick')||'';if(/salva|reset|ripristin/i.test(oc))b.style.display=ro?'none':'';});
+};
+const _salvaImpOrig=salvaImpostazioni;
+window.salvaImpostazioni=async function(){ if(permessoImp()!=='edit')return toast('Impostazioni in sola lettura','warn'); return _salvaImpOrig.apply(this,arguments); };
 
 /* ── Cambio password personale ── */
 function apriCambioPassword(){
@@ -11509,8 +11538,21 @@ let _utEditId=null;
 function apriGestioneUtenti(){
   if(!isAdmin())return;
   _creaModale('modal-utenti','👥 <span class="acc">Gestione utenti</span>','860px','<div id="ut-body"></div>',
-    `<button class="btn-s" onclick="closeModal('modal-utenti')">Chiudi</button>`);
+    `<button class="btn-s" onclick="mostraChiaveAuto()" style="margin-right:auto">🔑 Chiave accesso automatico</button><button class="btn-s" onclick="closeModal('modal-utenti')">Chiudi</button>`);
   _utEditId=null;renderUtenti();openModal('modal-utenti');
+}
+function mostraChiaveAuto(){
+  if(!isAdmin())return;
+  if(!gDriveToken||!gDriveToken.refresh_token)return toast('Chiave non disponibile: scollega e ricollega Google (con l\'account della banda)','warn');
+  _creaModale('modal-chiave','🔑 <span class="acc">Chiave di accesso automatico</span>','560px',
+    `<p style="font-size:13px;color:var(--gray);margin-bottom:10px;line-height:1.5">Con questa chiave l'app si collega da sola a Google Drive, senza la schermata di accesso Google. Deve essere stata ottenuta accedendo con l'<b>account Google dedicato alla banda</b>. Consegnala solo a chi prepara l'app e non condividerla con altri.</p><textarea id="chiave-auto" class="inp" rows="4" readonly style="font-family:monospace;font-size:11px;word-break:break-all">${gDriveToken.refresh_token}</textarea>`,
+    `<button class="btn-s" onclick="closeModal('modal-chiave')">Chiudi</button><button class="btn-p" onclick="copiaChiaveAuto()">📋 Copia</button>`);
+  openModal('modal-chiave');
+}
+function copiaChiaveAuto(){
+  const t=document.getElementById('chiave-auto');if(!t)return;t.select();
+  try{navigator.clipboard.writeText(t.value);}catch(e){try{document.execCommand('copy');}catch(x){}}
+  toast('✓ Chiave copiata');
 }
 function renderUtenti(){
   const adm=utentiDB.utenti.filter(u=>u.ruolo==='admin'&&u.attivo!==false).length;
@@ -11544,6 +11586,7 @@ function renderUtenti(){
             <span><button class="btn-s" onclick="presetPermessi('none')">Tutto nascosto</button> <button class="btn-s" onclick="presetPermessi('view')">Tutto in lettura</button> <button class="btn-s" onclick="presetPermessi('edit')">Tutto modificabile</button></span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${griglia}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-top:8px"><span style="font-size:12px;font-weight:700">⚙️ Impostazioni</span><select class="inp" id="ut-imp" style="width:auto;padding:5px 8px"><option value="none" ${(u.impostazioni||'none')==='none'?'selected':''}>Nascosto</option><option value="view" ${u.impostazioni==='view'?'selected':''}>Sola lettura</option><option value="edit" ${u.impostazioni==='edit'?'selected':''}>Modifica</option></select></div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button class="btn-s" onclick="_utEditId=null;renderUtenti()">Annulla</button><button class="btn-p" onclick="salvaUtente()">💾 Salva utente</button></div>
       </div>`;
@@ -11568,6 +11611,7 @@ async function salvaUtente(){
   if(nuovo){u={id:'u_'+_rnd(),nome};utentiDB.utenti.push(u);}
   else u=utentiDB.utenti.find(x=>x.id===_utEditId);
   u.ruolo=ruoloEl.value;u.attivo=attEl.value!=='0';u.permessi=permessi;
+  const impEl=document.getElementById('ut-imp');u.impostazioni=(u.ruolo==='admin'||!impEl)?'none':impEl.value;
   if(pw)await impostaPw(u,pw);
   u._mod=new Date().toISOString();
   if(u.id===utenteCorrente.id)utenteCorrente=u;
