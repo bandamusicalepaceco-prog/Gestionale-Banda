@@ -4,7 +4,7 @@
    per le chiamate API Google Drive.
    ============================================================ */
 
-const CACHE_NAME = 'gestionale-banda-v6';
+const CACHE_NAME = 'gestionale-banda-v7';
 
 // File da mettere in cache all'installazione
 const PRECACHE_URLS = [
@@ -55,11 +55,22 @@ self.addEventListener('fetch', event => {
 
   // Le chiamate alle API Google vanno sempre in rete
   if (NETWORK_ONLY.some(pattern => url.includes(pattern))) {
-    event.respondWith(fetch(event.request).catch(() =>
-      new Response(JSON.stringify({ error: 'offline' }), {
-        headers: { 'Content-Type': 'application/json' }
-      })
-    ));
+    // Nessuna risposta finta: se la rete manca la richiesta fallisce, così l'app sa che Drive non è raggiungibile
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // La pagina principale: prima la rete (sempre l'ultima versione), la cache solo se si è offline
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response && response.status === 200 && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then(c => c || caches.match('./index.html')))
+    );
     return;
   }
 
