@@ -500,6 +500,9 @@ button:not(:disabled){-webkit-tap-highlight-color:transparent}
 #main .nav-btn{color:var(--muted)!important;background:var(--surface)!important;border:1px solid var(--line)!important;box-shadow:var(--shadow-sm)}
 #main .nav-btn:hover{color:var(--text)!important;background:var(--grayl)!important}
 #main .nav-btn.active{background:var(--navy)!important;border-color:var(--navy)!important;color:#fff!important}
+
+/* Carica / Salva / Backup: tolti (i dati vivono su Google Drive) */
+button[onclick^="apriFileJson"],button[onclick^="salvaDati"],button[onclick="openModal('modal-backup')"],button[onclick^="openModal('modal-backup')"],#mob-btn-salva-json{display:none!important}
 </style>
 </head>
 <body>
