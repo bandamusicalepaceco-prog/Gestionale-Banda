@@ -349,6 +349,158 @@
   .btn-welcome-secondary:hover{border-color:var(--gold);color:var(--goldl);transform:translateY(-2px);}
 </style>
 <style>#btn-gdrive,#btn-carica-drive,#btn-salva-drive,#mob-btn-gdrive,#mob-btn-carica-drive,#mob-btn-salva-drive{display:none!important}</style>
+<style id="tema-moderno">
+/* ═════════ TEMA MODERNO (chiaro e pulito) ═════════
+   Sovrascrive soltanto l'aspetto. I colori scelti in Impostazioni (blu notte / oro, ecc.)
+   restano gli accenti: --navy = colore principale, --gold = colore di risalto. */
+:root{
+  --bg:#f3f5f9; --surface:#ffffff; --surface2:#f8fafc;
+  --line:#e6eaf1; --text:#1e293b; --muted:#64748b;
+  --radius:16px; --radius-sm:10px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.05),0 1px 3px rgba(15,23,42,.06);
+  --shadow:0 1px 3px rgba(15,23,42,.05),0 8px 24px rgba(15,23,42,.07);
+  --shadow-lg:0 20px 60px rgba(15,23,42,.18);
+  --border:#e6eaf1; --cream:#f8fafc; --grayl:#f1f5f9; --gray:#64748b;
+  --ring:0 0 0 3px color-mix(in srgb,var(--gold) 28%,transparent);
+}
+html body{
+  background:var(--bg)!important;
+  color:var(--text);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  line-height:1.5;
+}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+input:focus,select:focus,textarea:focus{outline:none!important;border-color:var(--gold)!important;box-shadow:var(--ring)}
+
+/* ── Intestazione: barra scura sottile e piatta ── */
+#header{border-bottom:none!important;box-shadow:0 1px 0 rgba(255,255,255,.06),0 4px 18px rgba(15,23,42,.18)!important}
+#header-top{min-height:56px}
+.logo-orb{box-shadow:0 0 0 3px rgba(255,255,255,.12)!important}
+.logo-title,.page-title,.card-title,.stat-val,.kpi-val{font-family:inherit!important}
+.logo-title{letter-spacing:.06em;font-size:13px}
+#header-nav{padding:0 14px 10px;gap:4px}
+.nav-btn{border:none!important;border-radius:999px!important;padding:7px 14px!important;font-size:12px!important;font-weight:600;color:rgba(255,255,255,.72)!important;background:transparent!important;transition:background .15s,color .15s}
+.nav-btn:hover{background:rgba(255,255,255,.1)!important;color:#fff!important}
+.nav-btn.active{background:#fff!important;color:var(--navy)!important;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+#user-bar{background:var(--header-bg,#16213e)}
+
+/* ── Contenuto ── */
+#main{margin-top:0!important;padding:26px 18px 90px!important}
+.page-title{color:var(--text)!important;font-size:26px!important;font-weight:800!important;letter-spacing:-.02em;margin-bottom:20px!important}
+#main > .tab > .page-title + *{margin-top:0}
+
+/* testi pensati per lo sfondo scuro, direttamente sulla pagina */
+#main [style*="color:rgba(255,255,255"]:not(.card-head *):not(.calc-box *):not(button):not(button *):not([style*="background:var(--navy"] *):not([style*="background:linear-gradient"] *):not([style*="background:#1"] *):not([style*="background:var(--navy"]):not([style*="background:linear-gradient"]):not([style*="background:#1"]){color:var(--muted)!important}
+#main [style*="color:#fff"]:not(.card-head *):not(.calc-box *):not(button):not(button *):not(th):not(th *):not([style*="background"]):not([style*="background"] *):not(.badge):not(.btn-p):not(.nav-btn){color:var(--text)!important}
+#main [style*="color:var(--goldl)"]:not(.card-head *):not(.calc-box *):not(button):not([style*="background"]):not([style*="background"] *){color:var(--navy)!important}
+
+/* ── Schede ── */
+.card{background:var(--surface)!important;border:1px solid var(--line);border-radius:var(--radius)!important;box-shadow:var(--shadow)!important}
+.card-head{background:var(--surface)!important;border-bottom:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0!important;padding:16px 22px!important}
+.card-title{color:var(--text)!important;font-size:16px!important;font-weight:700!important;letter-spacing:-.01em}
+.card-title .acc{color:var(--navy)!important;opacity:.7}
+.card-head [style*="color:#fff"],.card-head [style*="color: #fff"]{color:var(--text)!important}
+.card-head [style*="color:rgba(255,255,255"]{color:var(--muted)!important}
+.card-head [style*="background:rgba(255,255,255"],.card-head [style*="background: rgba(255,255,255"]{background:var(--grayl)!important;border-color:var(--line)!important}
+.card-head [style*="border-color:rgba(255,255,255"],.card-head [style*="border:1px solid rgba(255,255,255"]{border-color:var(--line)!important}
+.card-head .btn-s{color:var(--text)!important;border-color:var(--line)!important}
+
+.stat-card,.kpi-card{background:var(--surface)!important;border:1px solid var(--line);border-radius:var(--radius)!important;box-shadow:var(--shadow-sm)!important}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)!important}
+.stat-val{font-size:28px!important;font-weight:800!important;letter-spacing:-.02em;color:var(--text)!important}
+.stat-label{color:var(--text)!important;font-weight:700}
+.stat-sub,.kpi-label{color:var(--muted)!important}
+.stat-icon{width:44px;height:44px;border-radius:12px;background:var(--grayl);display:flex;align-items:center;justify-content:center;font-size:22px!important}
+
+/* ── Tabelle ── */
+table{border-collapse:separate;border-spacing:0}
+th,.card .table-scroll table th,.table-scroll table th{background:var(--surface2)!important;color:var(--muted)!important;font-size:11px!important;font-weight:700!important;letter-spacing:.06em!important;border-bottom:1px solid var(--line)!important}
+td{color:var(--text)!important;border-bottom:1px solid var(--line)!important;padding:12px 14px}
+tr.rh:hover td,tbody tr:hover td{background:#f8fafc}
+.table-scroll{border-radius:0 0 var(--radius) var(--radius)!important}
+.reg-table thead th,.reg-table thead th.col-nome{background:var(--surface2)!important;color:var(--muted)!important;border-right:1px solid var(--line)!important}
+.reg-table thead th.col-nome,.reg-table tbody td.td-nome,.reg-table tfoot td.td-nome{border-right:2px solid var(--line)!important}
+.reg-table tbody tr:nth-child(even) td,.reg-table tbody tr:nth-child(even) td.td-nome{background:#fbfcfe}
+
+/* ── Pulsanti ── */
+.btn-p{background:var(--gold)!important;color:var(--navy)!important;border:none!important;border-radius:var(--radius-sm)!important;padding:10px 20px!important;font-weight:700!important;letter-spacing:.01em!important;box-shadow:var(--shadow-sm);transition:transform .12s,box-shadow .12s,filter .12s}
+.btn-p:hover{opacity:1!important;filter:brightness(1.05);box-shadow:var(--shadow);transform:translateY(-1px)}
+.btn-p:active{transform:none}
+.btn-s{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:var(--radius-sm)!important;padding:8px 14px!important;font-weight:600!important;transition:background .12s,border-color .12s}
+.btn-s:hover{opacity:1!important;background:var(--grayl)!important;border-color:#cbd5e1!important}
+.btn-d{border-radius:var(--radius-sm)!important;background:#fff!important;border:1px solid #fecaca!important}
+.btn-d:hover{background:var(--redbg)!important}
+.btn-ico{border-radius:var(--radius-sm)!important;border:1px solid var(--line)!important;background:var(--surface)!important}
+.btn-ico:hover{background:var(--grayl)!important}
+.btn-ico.red{border-color:#fecaca!important}
+button:not(:disabled){-webkit-tap-highlight-color:transparent}
+
+/* ── Campi ── */
+.inp,input[type=text],input[type=number],input[type=date],input[type=password],input[type=email],input[type=time],select,textarea{border:1px solid var(--line);border-radius:var(--radius-sm);background:#fff;color:var(--text);transition:border-color .15s,box-shadow .15s}
+.inp{padding:10px 12px!important}
+.lbl,.sec-label,.detail-key{color:var(--muted)!important;font-weight:700}
+.form-act{background:var(--surface2)!important;border-top:1px solid var(--line)!important;border-radius:0 0 var(--radius) var(--radius)}
+.riepilogo{background:var(--surface2)!important;border:1px solid var(--line)!important;border-radius:var(--radius-sm)!important}
+.presenti-header{background:var(--surface2)!important}
+.detail-cell{border-bottom:1px solid var(--line)!important}
+
+/* ── Badge ── */
+.badge{padding:3px 10px;font-size:10.5px;letter-spacing:.02em}
+
+/* ── Selezione anno ── */
+.anno-btn{background:var(--surface)!important;border:1px solid var(--line)!important;color:var(--muted)!important;border-radius:999px!important;padding:7px 18px!important;font-size:13px!important;font-weight:600;box-shadow:var(--shadow-sm)}
+.anno-btn:hover{color:var(--text)!important}
+.anno-btn.active{background:var(--navy)!important;border-color:var(--navy)!important;color:#fff!important;box-shadow:0 4px 12px rgba(15,23,42,.18)}
+#main select[style*="background:var(--navy)"]{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:999px!important;box-shadow:var(--shadow-sm)}
+#main button[style*="border:2px dashed rgba(255,255,255"]{border-color:#cbd5e1!important;color:var(--muted)!important;border-radius:999px!important}
+
+/* ── Riquadro calcoli ── */
+.calc-box{background:var(--navy)!important;border-radius:var(--radius)!important}
+
+/* ── Finestre ── */
+.modal{background:rgba(15,23,42,.45)!important;backdrop-filter:blur(6px)}
+.modal-box{border-radius:20px!important;box-shadow:var(--shadow-lg)!important;border:1px solid var(--line)}
+#dialog-overlay{background:rgba(15,23,42,.5)!important}
+.dialog-box{border-radius:20px!important;box-shadow:var(--shadow-lg)!important}
+.dialog-input{border-radius:var(--radius-sm)}
+.dialog-btn-ok,.dialog-btn-cancel{border-radius:var(--radius-sm)}
+.dropdown-menu,.comune-dd{border-radius:14px!important;box-shadow:var(--shadow-lg)!important;border:1px solid var(--line)!important}
+.dropdown-item:hover,.comune-dd div:hover{background:var(--grayl)!important}
+#toast-container > *{border-radius:12px!important;box-shadow:var(--shadow-lg)!important}
+
+/* ── Schermata di accesso ── */
+#login-overlay{background:radial-gradient(1200px 600px at 20% -10%,color-mix(in srgb,var(--navy) 14%,transparent),transparent),radial-gradient(900px 500px at 100% 110%,color-mix(in srgb,var(--gold) 18%,transparent),transparent),var(--bg)!important}
+#login-overlay > div{border-radius:24px!important;box-shadow:var(--shadow-lg)!important;border:1px solid var(--line)}
+
+/* ── Barra di navigazione mobile (PWA) ── */
+#mobile-bottom-nav{background:rgba(255,255,255,.92)!important;border-top:1px solid var(--line)!important;box-shadow:0 -4px 20px rgba(15,23,42,.08)!important}
+.mob-nav-btn{color:#94a3b8!important}
+.mob-nav-btn.active{color:var(--navy)!important}
+.mob-nav-btn.active::before{background:var(--gold)!important}
+.mob-nav-btn:active{background:var(--grayl)!important;color:var(--navy)!important}
+#mob-extra-panel{border-radius:20px 0 0 20px}
+
+@media(max-width:768px){
+  #main{padding:18px 12px 96px!important}
+  .page-title{font-size:22px!important}
+  .card-head{padding:14px 16px!important}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* testi oro su fondo chiaro: contrasto insufficiente, si usa il colore principale */
+.card-head [style*="color:var(--goldl)"],.card-head [style*="color:var(--gold)"],.card-head [style*="color: var(--goldl)"],
+#main button[style*="color:var(--goldl)"],#main button[style*="color:var(--gold)"],
+.card-title span[style*="color"]{color:var(--navy)!important}
+.card-head button[style*="border:1px solid var(--gold"],.card-head button[style*="border-color:var(--gold"]{border-color:var(--navy)!important}
+
+/* sotto-schede dentro le pagine (es. Presenze): pillole chiare */
+#main .nav-btn{color:var(--muted)!important;background:var(--surface)!important;border:1px solid var(--line)!important;box-shadow:var(--shadow-sm)}
+#main .nav-btn:hover{color:var(--text)!important;background:var(--grayl)!important}
+#main .nav-btn.active{background:var(--navy)!important;border-color:var(--navy)!important;color:#fff!important}
+</style>
 </head>
 <body>
 
@@ -11068,7 +11220,16 @@ function mostraLogin(msg){
   setTimeout(()=>(u.value?document.getElementById('login-pass'):u).focus(),50);
 }
 let _tentativi=0,_bloccatoFino=0;
+let _loginInCorso=false;
 async function eseguiLogin(){
+  if(_loginInCorso)return; // un solo tentativo alla volta: clic e Invio non si sommano
+  _loginInCorso=true;
+  const b=document.getElementById('login-btn'),t=b?b.textContent:'';
+  if(b){b.disabled=true;b.textContent='Accesso in corso…';}
+  try{await _eseguiLoginBase();}
+  finally{_loginInCorso=false;if(b){b.disabled=false;b.textContent=t||'Accedi';}}
+}
+async function _eseguiLoginBase(){
   const nome=document.getElementById('login-user').value.trim().toLowerCase();
   const pw=document.getElementById('login-pass').value;
   const err=document.getElementById('login-err');
@@ -11089,7 +11250,7 @@ async function eseguiLogin(){
   if(u.alg!=='pbkdf2'){const pd=u.pwDefault;await impostaPw(u,pw);if(pd)u.pwDefault=true;salvaUtentiDrive();} // aggiorna al nuovo formato di password
   try{localStorage.setItem('banda_ultimo_utente',u.nome);}catch(e){}
   haScrittura=true;
-  if(_devoCompetere()&&gDriveToken){haScrittura=false;_lockInfo=null;await aggiornaLock(true);}
+  if(_devoCompetere()&&gDriveToken){haScrittura=false;_lockInfo=null;aggiornaLock(true);} // il turno si prende in sottofondo: l'app si apre subito
   document.getElementById('login-overlay').style.display='none';
   avviaHeartbeatLock();
   applicaPermessi();
