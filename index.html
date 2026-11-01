@@ -7641,6 +7641,7 @@ function _forzaLogoutDrive(motivo){
 // === _isTokenScaduto (from Windows) ===
 function _isTokenScaduto(){
   if(!gDriveToken) return true;
+  if(!gDriveToken.access_token) return true; // solo chiave di rinnovo (accesso automatico): serve un access token nuovo
   if(!gDriveToken.expiry_timestamp) return false; // token vecchio senza timestamp: proviamo lo stesso
   return Date.now() >= gDriveToken.expiry_timestamp;
 }
@@ -11380,7 +11381,7 @@ let _utEditId=null;
 function apriGestioneUtenti(){
   if(!isAdmin())return;
   _creaModale('modal-utenti','👥 <span class="acc">Gestione utenti</span>','860px','<div id="ut-body"></div>',
-    `<button class="btn-s" onclick="mostraChiaveAuto()" style="margin-right:auto">🔑 Chiave accesso automatico</button><button class="btn-s" onclick="closeModal('modal-utenti')">Chiudi</button>`);
+    `<button class="btn-s" onclick="mostraChiaveAuto()" style="margin-right:auto">🔑 Chiave accesso automatico</button><button class="btn-s" onclick="apriBotTelegram()">🤖 Bot Telegram</button><button class="btn-s" onclick="closeModal('modal-utenti')">Chiudi</button>`);
   _utEditId=null;renderUtenti();openModal('modal-utenti');
 }
 function mostraChiaveAuto(){
@@ -11402,6 +11403,58 @@ function copiaChiaveAuto(){
   const t=document.getElementById('chiave-auto');if(!t)return;t.select();
   try{navigator.clipboard.writeText(t.value);}catch(e){try{document.execCommand('copy');}catch(x){}}
   toast('✓ Chiave copiata');
+}
+
+// ===== Bot Telegram: password e utenti ammessi, salvati su Drive (telegram_bot.json) =====
+const TG_FILE='telegram_bot.json';
+async function _tgLeggi(){
+  const{fileId}=await _driveTrovaFile(TG_FILE,false);
+  if(!fileId)return null;
+  const r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',{headers:{'Authorization':'Bearer '+gDriveToken.access_token}});
+  if(!r.ok)return null;
+  try{return await r.json();}catch(e){return null;}
+}
+async function _tgHash(sale,pwd){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(sale+pwd));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function apriBotTelegram(){
+  if(!isAdmin())return;
+  if(!gDriveToken||_offline)return toast('Serve la connessione a Google Drive','warn');
+  let cfg=null;
+  try{await refreshTokenIfNeeded();cfg=await _tgLeggi();}catch(e){return toast('Impossibile leggere da Drive','err');}
+  const righe=cfg&&cfg.utenti?Object.keys(cfg.utenti).map(k=>k+' = '+cfg.utenti[k]).join('\n'):'';
+  _creaModale('modal-tg','🤖 <span class="acc">Bot Telegram</span>','560px',
+    `<p style="font-size:13px;color:var(--gray);margin-bottom:10px;line-height:1.5">Password richiesta dal bot per salvare le presenze delle prove: ${cfg&&cfg.pwdHash?'<b>attualmente impostata</b>':'<b>non ancora impostata</b>'}. Lasciala vuota per non cambiarla.</p>
+     <label class="lbl">Nuova password</label>
+     <input class="inp" id="tg-pwd" type="password" autocomplete="new-password" placeholder="${cfg&&cfg.pwdHash?'(invariata)':'scegli una password'}" style="margin-bottom:12px">
+     <label class="lbl">Utenti autorizzati (uno per riga: ID Telegram = Nome)</label>
+     <textarea class="inp" id="tg-utenti" rows="6" style="font-family:monospace" placeholder="123456789 = Mario Rossi">${esc(righe)}</textarea>
+     <p style="font-size:12px;color:var(--gray);margin-top:6px">Chi scrive al bot senza essere in elenco riceve il proprio ID da copiare qui.</p>`,
+    `<button class="btn-s" onclick="closeModal('modal-tg')">Chiudi</button><button class="btn-p" onclick="salvaBotTelegram()">💾 Salva</button>`);
+  openModal('modal-tg');
+}
+async function salvaBotTelegram(){
+  if(!isAdmin())return;
+  try{
+    await refreshTokenIfNeeded();
+    const prec=await _tgLeggi()||{};
+    const utenti={};
+    (document.getElementById('tg-utenti').value||'').split('\n').forEach(r=>{
+      const m=r.match(/^\s*(\d{5,})\s*[=:,;]\s*(.+?)\s*$/);
+      if(m)utenti[m[1]]=m[2];
+    });
+    const pwd=document.getElementById('tg-pwd').value;
+    const out={versione:1,sale:prec.sale||'',pwdHash:prec.pwdHash||'',utenti,aggiornato:new Date().toISOString(),da:(utenteCorrente&&utenteCorrente.nome)||''};
+    if(pwd){
+      if(pwd.length<4)return toast('La password deve avere almeno 4 caratteri','warn');
+      out.sale=_rnd();out.pwdHash=await _tgHash(out.sale,pwd);
+    }
+    if(!out.pwdHash)return toast('Scegli una password','warn');
+    await _driveScriviJson(TG_FILE,out);
+    closeModal('modal-tg');
+    toast('✓ Impostazioni del bot salvate','ok');
+  }catch(e){toast('Salvataggio non riuscito: '+(e.message||e),'err');}
 }
 function renderUtenti(){
   const adm=utentiDB.utenti.filter(u=>u.ruolo==='admin'&&u.attivo!==false).length;
