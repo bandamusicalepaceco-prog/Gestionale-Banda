@@ -2767,7 +2767,7 @@ async function driveUploadSectionFile(sezione, categoria, fileObj){
 }
 
 // Chiave di accesso automatico (account Google dedicato alla banda): se compilata, il direttivo non vede la schermata di Google.
-var GDRIVE_AUTO_REFRESH_TOKEN = '';
+var GDRIVE_AUTO_REFRESH_TOKEN = '1//03V5Zk_rOD0qoCgYIARAAGAMSNwF-L9IrDEMhzdMIcGK3wzSkUv1GN51fvLDLiVtjeej7WCZuSpCI2RvtWrpZ5ltfnyOmOQdBo2M';
 document.addEventListener('DOMContentLoaded', function(){
   const savedToken = localStorage.getItem('gDriveToken');
   if(savedToken){
@@ -11385,7 +11385,14 @@ function apriGestioneUtenti(){
 }
 function mostraChiaveAuto(){
   if(!isAdmin())return;
-  if(!gDriveToken||!gDriveToken.refresh_token)return toast('Chiave non disponibile: scollega e ricollega Google (con l\'account della banda)','warn');
+  if(!gDriveToken||!gDriveToken.refresh_token){
+    if(confirm('Per ottenere la chiave devo ricollegare Google con l\'account della banda.\n\nPremi OK: si apre Google, scegli l\'account della banda e accetta i permessi. Poi riapri Utenti e premi di nuovo il pulsante chiave.')){
+      try{fermaSincronizzazioneDrive();}catch(e){}
+      gDriveToken=null;localStorage.removeItem('gDriveToken');localStorage.removeItem('gDriveFileId');
+      loginGDrive();
+    }
+    return;
+  }
   _creaModale('modal-chiave','🔑 <span class="acc">Chiave di accesso automatico</span>','560px',
     `<p style="font-size:13px;color:var(--gray);margin-bottom:10px;line-height:1.5">Con questa chiave l'app si collega da sola a Google Drive, senza la schermata di accesso Google. Deve essere stata ottenuta accedendo con l'<b>account Google dedicato alla banda</b>. Consegnala solo a chi prepara l'app e non condividerla con altri.</p><textarea id="chiave-auto" class="inp" rows="4" readonly style="font-family:monospace;font-size:11px;word-break:break-all">${gDriveToken.refresh_token}</textarea>`,
     `<button class="btn-s" onclick="closeModal('modal-chiave')">Chiudi</button><button class="btn-p" onclick="copiaChiaveAuto()">📋 Copia</button>`);
