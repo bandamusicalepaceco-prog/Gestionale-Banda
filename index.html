@@ -2539,7 +2539,7 @@ async function _refreshDriveToken(){
     })
   });
   const d = await r.json();
-  if(!d.access_token) throw new Error(d.error_description || d.error || 'Refresh token non riuscito');
+  if(!d.access_token) throw new Error([d.error,d.error_description].filter(Boolean).join(': ') || ('Refresh token non riuscito (HTTP '+r.status+')'));
   gDriveToken = {
     ...gDriveToken,
     access_token: d.access_token,
@@ -11057,6 +11057,7 @@ async function refreshTokenIfNeeded(){
       _forzaLogoutDrive('Autorizzazione Google scaduta o revocata.');
       throw new Error('Sessione Drive scaduta.');
     }
+    window._ultimoErroreDrive=m;
     throw new Error('rete');
   }
 }
@@ -11066,6 +11067,11 @@ async function refreshTokenIfNeeded(){
 // ── Sincronizzazione quasi in tempo reale ──────────────────────────────────
 let _datiCaricatiDaDrive=false; // true solo dopo aver letto (o trovato assente) il backup su Drive in questa sessione
 let _bkFolderId=null, _fallimentiDrive=0, _offline=false, _pollInCorso=false, _ultimoErroreSalv='', _inSospeso=false;
+function _msgDriveNonRaggiungibile(e){
+  let det=(e&&e.message&&e.message!=='rete')?e.message:(window._ultimoErroreDrive||'');
+  if(/Failed to fetch|NetworkError|Load failed|TypeError/i.test(det)) det='nessuna connessione internet o Google bloccato dalla rete';
+  return 'Drive non raggiungibile, riprovo…'+(det?' ('+det+')':'');
+}
 function _erroreRete(e){ return e && (e.name==='TypeError' || (e.http && e.http>=500) || e.message==='rete'); }
 async function cercaCartellaDriveStrict(nome){
   const r = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name = '"+nome+"' and mimeType = 'application/vnd.google-apps.folder' and trashed = false")+'&fields=files(id)',{
@@ -11386,7 +11392,7 @@ async function scaricaUtentiDrive(){
       utenteCorrente=agg;
     }
     return true;
-  }catch(e){console.warn('Sync utenti:',e);aggiornaStatoLogin('⚠️ Sincronizzazione utenti non riuscita');return false;}
+  }catch(e){console.warn('Sync utenti:',e);window._ultimoErroreDrive=String((e&&e.message)||e);aggiornaStatoLogin('⚠️ Sincronizzazione utenti non riuscita');return false;}
 }
 async function salvaUtentiDrive(){
   salvaUtentiLocali();
@@ -11428,7 +11434,7 @@ async function avviaConnessione(){
     }catch(e){
       if(!gDriveToken){statoLogin('sync');return;}
       tentativi++;
-      statoLogin('attesa',tentativi>10&&!_erroreRete(e)?'Errore Drive: '+e.message+' — riprovo…':'Drive non raggiungibile, riprovo…');
+      statoLogin('attesa',_msgDriveNonRaggiungibile(e));
       await new Promise(r=>setTimeout(r,3000));
     }
   }
@@ -12019,7 +12025,7 @@ async function avviaConnessione(){
     }catch(e){
       if(!gDriveToken){avviaCollegamentoAutomatico();return;}
       tentativi++;
-      statoLogin('attesa',tentativi>10&&!_erroreRete(e)?'Errore Drive: '+e.message+' — riprovo…':'Drive non raggiungibile, riprovo…');
+      statoLogin('attesa',_msgDriveNonRaggiungibile(e));
       await new Promise(r=>setTimeout(r,3000));
     }
   }
@@ -12044,7 +12050,7 @@ async function risvegliaDaBackground(){
         return;
       }catch(e){
         if(!gDriveToken){avviaCollegamentoAutomatico();return;}
-        if(loggato)statoLogin('attesa','Drive non raggiungibile, riprovo…');
+        if(loggato)statoLogin('attesa',_msgDriveNonRaggiungibile(e));
         await new Promise(r=>setTimeout(r,3000));
       }
     }
