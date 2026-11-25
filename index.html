@@ -7939,6 +7939,26 @@ function caricaDati(input){
   reader.readAsText(file);
 }
 
+function mostraBannerAutosalvataggio(errore){
+  // Messaggio mostrato accanto alla scritta "sync" (stesso riquadro), per 3 secondi
+  let el=document.getElementById('drive-sync-status');
+  if(!el){
+    el=document.createElement('div');el.id='drive-sync-status';
+    el.style.cssText='position:fixed;left:12px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:99998;pointer-events:none;display:none';
+    document.body.appendChild(el);
+  }
+  clearTimeout(mostraBannerAutosalvataggio._t);
+  if(typeof aggiornaSyncStatus==='function') aggiornaSyncStatus('');
+  const base=el.style.display==='none'?'':el.textContent;
+  el.innerHTML='';
+  if(base){ el.appendChild(document.createTextNode(base+' ')); }
+  const pill=document.createElement('span');
+  pill.textContent=errore?('⚠ Autosalvataggio non riuscito'+(errore===true?'':': '+errore)):'✓ Autosalvataggio eseguito';
+  pill.style.cssText='display:inline-block;margin-left:4px;padding:2px 9px;border-radius:999px;font-weight:700;font-size:10px;color:#fff;background:'+(errore?'#b91c1c':'#15803d');
+  el.appendChild(pill);
+  el.style.display='';
+  mostraBannerAutosalvataggio._t=setTimeout(()=>{ if(typeof aggiornaSyncStatus==='function') aggiornaSyncStatus(''); else el.style.display='none'; }, errore?6000:3000);
+}
 function mostraIndicatore(testo, colore){
   const el = document.getElementById('autosave-indicator');
   if(!el) return;
@@ -8647,6 +8667,18 @@ function autosave(){
 
 // Autosave ogni 60 secondi
 setInterval(autosave, 60000);
+
+// Rete di sicurezza: ogni 3 secondi, se i dati sono cambiati, salva automaticamente.
+let _wdUltimo=null;
+setInterval(()=>{
+  try{
+    if(!_appAttiva||!utenteCorrente||typeof haScrittura==='undefined') return;
+    if(!haScrittura||_offline){ _wdUltimo=null; return; }
+    const chiave=JSON.stringify(raccogliDati()).replace(/"dataBackup":"[^"]*"/,'');
+    if(_wdUltimo===null){ _wdUltimo=chiave; return; }
+    if(chiave!==_wdUltimo){ _wdUltimo=chiave; autosave(); }
+  }catch(e){}
+},3000);
 
 // Carica da localStorage all'avvio se esiste un backup
 function caricaLocalStorage(){
@@ -11197,7 +11229,7 @@ async function salvaSuDrive(silenzioso){
     localStorage.setItem('gDriveFileId', risultato.id);
     driveFileModTime = risultato.modifiedTime || driveFileModTime;
     driveLastSyncTime = Date.now();
-    if(!silenzioso) toast('✓ Backup salvato su Google Drive!');
+    if(!silenzioso) toast('✓ Backup salvato su Google Drive!'); else mostraBannerAutosalvataggio();
     return true;
   }catch(e){
     if(e.conflitto){
@@ -11231,6 +11263,7 @@ async function salvaSuDrive(silenzioso){
         <input class="inp" id="login-user" type="text" autocomplete="username" style="margin-bottom:14px"/>
         <label class="lbl">Password</label>
         <input class="inp" id="login-pass" type="password" autocomplete="current-password" style="margin-bottom:10px"/>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4b5563;margin:0 0 10px;cursor:pointer"><input type="checkbox" id="login-salva-utente" style="width:auto;margin:0"/> Salva utente</label>
         <div id="login-err" style="min-height:18px;font-size:12px;color:#b91c1c;margin-bottom:8px"></div>
         <button class="btn-p" id="login-btn" style="width:100%;padding:12px" onclick="eseguiLogin()">Accedi</button>
       </div>
@@ -11433,7 +11466,7 @@ function mostraLogin(msg){
   document.getElementById('login-pass').value='';
   document.getElementById('login-err').textContent=msg||'';
   const u=document.getElementById('login-user');
-  try{u.value=localStorage.getItem('banda_ultimo_utente')||'';}catch(e){}
+  try{u.value=localStorage.getItem('banda_ultimo_utente')||'';const cs=document.getElementById('login-salva-utente');if(cs)cs.checked=localStorage.getItem('banda_salva_utente')!=='0';}catch(e){}
   aggiornaStatoLogin();
   setTimeout(()=>(u.value?document.getElementById('login-pass'):u).focus(),50);
 }
@@ -11466,7 +11499,7 @@ async function _eseguiLoginBase(){
   utenteCorrente=u;
   if(!puoVedereQualcosa()){utenteCorrente=null;err.textContent='Nessuna sezione abilitata: contatta l\'amministratore';return;}
   if(u.alg!=='pbkdf2'){const pd=u.pwDefault;await impostaPw(u,pw);if(pd)u.pwDefault=true;salvaUtentiDrive();} // aggiorna al nuovo formato di password
-  try{localStorage.setItem('banda_ultimo_utente',u.nome);}catch(e){}
+  try{const cs=document.getElementById('login-salva-utente');if(!cs||cs.checked){localStorage.setItem('banda_ultimo_utente',u.nome);localStorage.setItem('banda_salva_utente','1');}else{localStorage.removeItem('banda_ultimo_utente');localStorage.setItem('banda_salva_utente','0');}}catch(e){}
   haScrittura=true;
   if(_devoCompetere()&&gDriveToken){haScrittura=false;_lockInfo=null;aggiornaLock(true);} // il turno si prende in sottofondo: l'app si apre subito
   document.getElementById('login-overlay').style.display='none';
@@ -11511,7 +11544,22 @@ window.aggiornaPulsanteGDrive=function(){
   if(utenteCorrente&&!isAdmin()){['btn-gdrive','btn-carica-drive'].forEach(i=>{const e=document.getElementById(i);if(e)e.style.display='none';});}
   if(utenteCorrente&&!puoModificare()){const e=document.getElementById('btn-salva-drive');if(e)e.style.display='none';}
 };
+function aggiornaBannerLettura(){
+  let b=document.getElementById('banner-sola-lettura');
+  const attesa=!!utenteCorrente&&!haScrittura&&_devoCompetere();
+  if(!attesa){if(b)b.style.display='none';return;}
+  if(!b){
+    b=document.createElement('div');b.id='banner-sola-lettura';
+    b.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99999;background:#b45309;color:#fff;padding:9px 18px;border-radius:999px;font:600 13px/1.3 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:92vw;text-align:center;pointer-events:none';
+    document.body.appendChild(b);
+  }
+  const chi=(_lockInfo&&_lockInfo.nome)?_lockInfo.nome:'un altro utente';
+  b.textContent='🔒 '+chi+' sta eseguendo modifiche — sei in sola lettura fino a quando non esce';
+  b.style.display='';
+}
+setInterval(()=>{try{aggiornaBannerLettura();}catch(e){}},2000);
 function aggiornaChipUtente(tabId){
+  try{aggiornaBannerLettura();}catch(e){}
   const c=document.getElementById('user-chip');if(!c)return;
   if(!utenteCorrente){c.textContent='';return;}
   const tab=tabId||((document.querySelector('.tab.active')||{id:''}).id.replace(/^tab-/,''));
@@ -11654,9 +11702,10 @@ window.salvaSuDrive=async function(silenzioso){
   if(!haScrittura)return false; // lettore: non scrive mai
   const firma=JSON.stringify({...raccogliDati(),dataBackup:0});
   if(silenzioso===true&&firma===_firmaUltimoSalvataggio&&!_inSospeso)return true; // nessuna modifica
-  if(_offline){_inSospeso=true;return false;}
+  if(_offline){_inSospeso=true;if(silenzioso===true)mostraBannerAutosalvataggio('Drive non raggiungibile');return false;}
   const ok=await _salvaSuDriveOrig(silenzioso);
   if(ok){_firmaUltimoSalvataggio=firma;_inSospeso=false;}
+  else if(silenzioso===true){mostraBannerAutosalvataggio(_ultimoErroreSalv==='rete'?'Drive non raggiungibile':_ultimoErroreSalv==='conflitto'?'dati modificati da un altro utente':(_datiCaricatiDaDrive?true:'dati non ancora caricati da Drive'));}
   else if(_ultimoErroreSalv==='rete'){_inSospeso=true;_fallimentiDrive+=2;vaiOffline();}
   return ok;
 };
