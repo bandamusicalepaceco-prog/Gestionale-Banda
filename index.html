@@ -11276,6 +11276,10 @@ async function salvaSuDrive(silenzioso){
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4b5563;margin:0 0 10px;cursor:pointer"><input type="checkbox" id="login-salva-utente" style="width:auto;margin:0"/> Salva utente</label>
         <div id="login-err" style="min-height:18px;font-size:12px;color:#b91c1c;margin-bottom:8px"></div>
         <button class="btn-p" id="login-btn" style="width:100%;padding:12px" onclick="eseguiLogin()">Accedi</button>
+        <div id="login-bio-wrap" style="display:none;margin-top:12px;text-align:center">
+          <button class="btn-s" id="login-bio-btn" style="width:100%;padding:11px;font-weight:700" onclick="accediConBiometria()">🔒 Accedi con impronta / volto (<span id="login-bio-nome"></span>)</button>
+          <button onclick="disattivaBiometria()" style="margin-top:6px;background:none;border:none;color:#6b7280;font-size:11px;cursor:pointer;text-decoration:underline">Disattiva su questo dispositivo</button>
+        </div>
       </div>
       <div id="login-sync-box" style="display:none">
         <p style="font-size:13px;color:#4b5563;margin:0 0 14px">Per usare l'app serve il collegamento a Google Drive. Premi Sincronizza e accedi con l'account Google della banda.</p>
@@ -11465,6 +11469,7 @@ function statoLogin(s,msg){
   document.getElementById('login-overlay').style.display='flex';
   document.getElementById('login-wait').style.display=s==='attesa'?'':'none';
   document.getElementById('login-box').style.display=s==='login'?'':'none';
+  if(s==='login'){try{aggiornaPulsanteBio();}catch(e){}}
   document.getElementById('login-sync-box').style.display=s==='sync'?'':'none';
   document.getElementById('login-cancel').style.display=(s==='attesa'&&_loginDrivePending)?'':'none';
   if(s==='attesa')document.getElementById('login-wait-msg').textContent=msg||'';
@@ -11478,6 +11483,7 @@ function mostraLogin(msg){
   const u=document.getElementById('login-user');
   try{u.value=localStorage.getItem('banda_ultimo_utente')||'';const cs=document.getElementById('login-salva-utente');if(cs)cs.checked=localStorage.getItem('banda_salva_utente')!=='0';}catch(e){}
   aggiornaStatoLogin();
+  try{aggiornaPulsanteBio();}catch(e){}
   setTimeout(()=>(u.value?document.getElementById('login-pass'):u).focus(),50);
 }
 let _tentativi=0,_bloccatoFino=0;
@@ -11506,9 +11512,13 @@ async function _eseguiLoginBase(){
   }
   if(u.attivo===false){err.textContent='Utente disattivato: contatta l\'amministratore';return;}
   _tentativi=0;
+  await _completaLogin(u,pw);
+}
+async function _completaLogin(u,pw){
+  const err=document.getElementById('login-err');
   utenteCorrente=u;
   if(!puoVedereQualcosa()){utenteCorrente=null;err.textContent='Nessuna sezione abilitata: contatta l\'amministratore';return;}
-  if(u.alg!=='pbkdf2'){const pd=u.pwDefault;await impostaPw(u,pw);if(pd)u.pwDefault=true;salvaUtentiDrive();} // aggiorna al nuovo formato di password
+  if(pw&&u.alg!=='pbkdf2'){const pd=u.pwDefault;await impostaPw(u,pw);if(pd)u.pwDefault=true;salvaUtentiDrive();} // aggiorna al nuovo formato di password
   try{const cs=document.getElementById('login-salva-utente');if(!cs||cs.checked){localStorage.setItem('banda_ultimo_utente',u.nome);localStorage.setItem('banda_salva_utente','1');}else{localStorage.removeItem('banda_ultimo_utente');localStorage.setItem('banda_salva_utente','0');}}catch(e){}
   haScrittura=true;
   if(_devoCompetere()&&gDriveToken){haScrittura=false;_lockInfo=null;aggiornaLock(true);} // il turno si prende in sottofondo: l'app si apre subito
@@ -11516,7 +11526,108 @@ async function _eseguiLoginBase(){
   avviaHeartbeatLock();
   applicaPermessi();
   if(u.pwDefault&&u.ruolo==='admin')toast('Password admin predefinita: cambiala con il pulsante 🔑','warn');
+  else if(pw) setTimeout(()=>proponiBiometria(u),800);
 }
+/* ═════ Accesso con dati biometrici (impronta / volto / Windows Hello / Touch ID) ═════
+   Si attiva per dispositivo dopo un accesso con password. L'impronta non lascia mai il dispositivo:
+   il gestionale riceve solo l'esito della verifica. Se la password dell'utente cambia, va riattivato. */
+const BIO_KEY='banda_bio';
+function _bioDati(){try{return JSON.parse(localStorage.getItem(BIO_KEY)||'null');}catch(e){return null;}}
+function _b64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)));}
+function _deb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+async function bioDisponibile(){
+  try{
+    if(window.electron&&window.electron.biometriaDisponibile) return !!(await window.electron.biometriaDisponibile());
+    if(window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable&&window.isSecureContext)
+      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  }catch(e){}
+  return false;
+}
+async function _bioRegistra(u){
+  if(window.electron&&window.electron.biometriaVerifica){
+    const r=await window.electron.biometriaVerifica('attivare l\'accesso al Gestionale Banda');
+    if(!r||!r.ok) throw new Error((r&&r.errore)||'verifica non riuscita');
+    return {tipo:'electron'};
+  }
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'Gestionale Banda'},
+    user:{id:new TextEncoder().encode(String(u.id)).slice(0,64),name:u.nome,displayName:u.nome},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},
+    timeout:60000,attestation:'none'}});
+  if(!cred) throw new Error('registrazione annullata');
+  return {tipo:'webauthn',credId:_b64(cred.rawId)};
+}
+async function _bioVerifica(d){
+  if(d.tipo==='electron'){
+    if(!(window.electron&&window.electron.biometriaVerifica)) return false;
+    const r=await window.electron.biometriaVerifica('accedere al Gestionale Banda');
+    return !!(r&&r.ok);
+  }
+  const a=await navigator.credentials.get({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{type:'public-key',id:_deb64(d.credId)}],
+    userVerification:'required',timeout:60000}});
+  return !!a;
+}
+async function aggiornaPulsanteBio(){
+  const w=document.getElementById('login-bio-wrap');if(!w)return;
+  const d=_bioDati();
+  const ok=!!d&&await bioDisponibile();
+  w.style.display=ok?'':'none';
+  const l=document.getElementById('login-bio-nome');if(l&&d)l.textContent=d.nome;
+}
+async function accediConBiometria(){
+  const err=document.getElementById('login-err');
+  const d=_bioDati();if(!d){aggiornaPulsanteBio();return;}
+  if(_loginInCorso)return;
+  _loginInCorso=true;
+  try{
+    let ok=false;
+    try{ok=await _bioVerifica(d);}catch(e){ok=false;}
+    if(!ok){err.textContent='Riconoscimento non riuscito: riprova o usa la password.';return;}
+    const u=utentiDB.utenti.find(x=>x.id===d.utenteId);
+    if(!u){localStorage.removeItem(BIO_KEY);aggiornaPulsanteBio();err.textContent='Utente non più presente: accedi con la password.';return;}
+    if(u.attivo===false){err.textContent='Utente disattivato: contatta l\'amministratore';return;}
+    if(!u.hash||u.hash!==d.hashRif){localStorage.removeItem(BIO_KEY);aggiornaPulsanteBio();err.textContent='La password è cambiata: accedi con la password per riattivare l\'impronta.';return;}
+    err.textContent='';
+    await _completaLogin(u,null);
+  }finally{_loginInCorso=false;}
+}
+function disattivaBiometria(){
+  localStorage.removeItem(BIO_KEY);aggiornaPulsanteBio();
+  toast('Accesso con impronta/volto disattivato su questo dispositivo');
+}
+async function proponiBiometria(u){
+  try{
+    if(!u||!u.hash||!(await bioDisponibile()))return;
+    const d=_bioDati();
+    if(d&&d.utenteId===u.id&&d.hashRif===u.hash)return; // già attivo
+    if(localStorage.getItem('banda_bio_no_'+u.id)==='1')return; // l'utente ha detto "no" su questo dispositivo
+    let o=document.getElementById('bio-proposta');if(o)o.remove();
+    o=document.createElement('div');o.id='bio-proposta';
+    o.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(15,24,48,.55);display:flex;align-items:center;justify-content:center;padding:20px';
+    o.innerHTML='<div style="background:#fff;border-radius:18px;max-width:360px;width:100%;padding:24px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.4);font-family:Lato,system-ui,sans-serif">'
+      +'<div style="font-size:40px;margin-bottom:6px">🔒</div>'
+      +'<div style="font-size:16px;font-weight:800;color:#16213e;margin-bottom:8px">Accesso con impronta o volto</div>'
+      +'<div style="font-size:13px;color:#4b5563;margin-bottom:18px">Vuoi accedere ai prossimi avvii su questo dispositivo con impronta, volto o Windows Hello, senza scrivere la password?</div>'
+      +'<button class="btn-p" id="bio-si" style="width:100%;padding:11px;margin-bottom:8px">Attiva</button>'
+      +'<button class="btn-s" id="bio-dopo" style="width:100%;padding:9px;margin-bottom:6px">Non ora</button>'
+      +'<button id="bio-mai" style="background:none;border:none;color:#6b7280;font-size:12px;cursor:pointer;text-decoration:underline">Non chiedere più su questo dispositivo</button></div>';
+    document.body.appendChild(o);
+    o.querySelector('#bio-dopo').onclick=()=>o.remove();
+    o.querySelector('#bio-mai').onclick=()=>{localStorage.setItem('banda_bio_no_'+u.id,'1');o.remove();};
+    o.querySelector('#bio-si').onclick=async()=>{
+      try{
+        const r=await _bioRegistra(u);
+        localStorage.setItem(BIO_KEY,JSON.stringify({...r,utenteId:u.id,nome:u.nome,hashRif:u.hash}));
+        o.remove();toast('✓ Accesso con impronta/volto attivato su questo dispositivo');
+      }catch(e){toast('Attivazione non riuscita: '+(e.message||e),'warn');}
+    };
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(aggiornaPulsanteBio,300);});
 function esciUtente(){
   rilasciaLock();
   utenteCorrente=null;
