@@ -2532,8 +2532,8 @@ async function _refreshDriveToken(){
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id:     GDRIVE_CLIENT_ID,
-      client_secret: GDRIVE_CLIENT_SECRET,
+      client_id:     (gDriveToken.refresh_token===GDRIVE_AUTO_REFRESH_TOKEN) ? GDRIVE_AUTO_CLIENT_ID : GDRIVE_CLIENT_ID,
+      client_secret: (gDriveToken.refresh_token===GDRIVE_AUTO_REFRESH_TOKEN) ? GDRIVE_AUTO_CLIENT_SECRET : GDRIVE_CLIENT_SECRET,
       refresh_token: gDriveToken.refresh_token,
       grant_type:    'refresh_token'
     })
@@ -3087,14 +3087,18 @@ async function driveUploadSectionFile(sezione, categoria, fileObj){
 }
 
 // Chiave di accesso automatico (account Google dedicato alla banda): se compilata, il direttivo non vede la schermata di Google.
-var GDRIVE_AUTO_REFRESH_TOKEN = '1//03V5Zk_rOD0qoCgYIARAAGAMSNwF-L9IrDEMhzdMIcGK3wzSkUv1GN51fvLDLiVtjeej7WCZuSpCI2RvtWrpZ5ltfnyOmOQdBo2M';
+// Stessa chiave dell'app per PC/Mac (account Google della banda): accesso a Drive senza schermata di consenso.
+var GDRIVE_AUTO_REFRESH_TOKEN = '1//03Go_brGx3EpNCgYIARAAGAMSNwF-L9Irr2RigH9Q5irNh6jLgU39TOaYcSr4s8Yz2L2rQIvhi3bOianwQhHtsPrY8eNo4EBQ-xc';
+var GDRIVE_AUTO_CLIENT_ID = '485615526143-0ll8os3rri1jk1qt4pcr3gsrlo884h2t.apps.googleusercontent.com';
+var GDRIVE_AUTO_CLIENT_SECRET = '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';
 document.addEventListener('DOMContentLoaded', function(){
   const savedToken = localStorage.getItem('gDriveToken');
   if(savedToken){
     try{ gDriveToken = JSON.parse(savedToken); }catch(x){ gDriveToken = null; localStorage.removeItem('gDriveToken'); }
     if(gDriveToken && !gDriveToken.expires_at) gDriveToken.expires_at = 0; // forza il rinnovo
   }
-  if(!gDriveToken && GDRIVE_AUTO_REFRESH_TOKEN && sessionStorage.getItem('auto_tok_fail')!=='1'){
+  // Usa sempre la chiave automatica della banda (sostituisce eventuali collegamenti Google fatti a mano in passato)
+  if(GDRIVE_AUTO_REFRESH_TOKEN && (!gDriveToken || gDriveToken.refresh_token!==GDRIVE_AUTO_REFRESH_TOKEN)){
     gDriveToken = { refresh_token: GDRIVE_AUTO_REFRESH_TOKEN, expires_at: 0 };
   }
   aggiornaPulsanteGDrive(); // l'avvio vero (rinnovo, utenti, dati) è gestito dal modulo di accesso
@@ -11994,6 +11998,13 @@ setInterval(async()=>{
 /* ═════ Specifico PWA ═════ */
 let _autoOAuthInCorso=false;
 function avviaCollegamentoAutomatico(msg){
+  // Nessuna pagina di Google: si usa la chiave automatica della banda (come l'app per PC/Mac)
+  if(GDRIVE_AUTO_REFRESH_TOKEN){
+    if(sessionStorage.getItem('auto_tok_fail')==='1'){ statoLogin('sync',msg||'Collegamento a Drive non riuscito: premi Sincronizza per riprovare.'); return; }
+    gDriveToken={refresh_token:GDRIVE_AUTO_REFRESH_TOKEN,expires_at:0};
+    setTimeout(()=>avviaConnessione(),0);
+    return;
+  }
   if(_autoOAuthInCorso)return;
   const androidStandalone=/Android/i.test(navigator.userAgent)&&(matchMedia('(display-mode: standalone)').matches||navigator.standalone);
   const recente=Date.now()-(+sessionStorage.getItem('banda_auto_oauth')||0)<60000;
@@ -12006,7 +12017,7 @@ function avviaCollegamentoAutomatico(msg){
 }
 const _mostraLoginBase=mostraLogin;
 mostraLogin=function(msg){ if(!gDriveToken){avviaCollegamentoAutomatico(msg);return;} _mostraLoginBase(msg); };
-async function sincronizzaLogin(){ _pwSync=null;_loginDrivePending=true;statoLogin('attesa','Collegamento a Google Drive…');loginGDrive(); }
+async function sincronizzaLogin(){ _pwSync=null; if(GDRIVE_AUTO_REFRESH_TOKEN){ try{sessionStorage.removeItem('auto_tok_fail');}catch(e){} gDriveToken={refresh_token:GDRIVE_AUTO_REFRESH_TOKEN,expires_at:0}; avviaConnessione(); return; } _loginDrivePending=true;statoLogin('attesa','Collegamento a Google Drive…');loginGDrive(); }
 async function avviaConnessione(){
   const q=new URLSearchParams(location.search);
   if(q.get('code')&&localStorage.getItem('gdrive_oauth_pending')==='1'){statoLogin('attesa','Collegamento a Google in corso…');return;} // gdriveExchangeCode richiamerà questa funzione
