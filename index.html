@@ -7944,24 +7944,18 @@ function caricaDati(input){
 }
 
 function mostraBannerAutosalvataggio(errore){
-  // Messaggio mostrato accanto alla scritta "sync" (stesso riquadro), per 3 secondi
-  let el=document.getElementById('drive-sync-status');
-  if(!el){
-    el=document.createElement('div');el.id='drive-sync-status';
-    el.style.cssText='position:fixed;left:12px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:99998;pointer-events:none;display:none';
-    document.body.appendChild(el);
+  // PWA: piccolo banner che compare in basso e scompare da solo
+  let b=document.getElementById('banner-autosalvataggio');
+  if(!b){
+    b=document.createElement('div');b.id='banner-autosalvataggio';
+    b.style.cssText='position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);z-index:99998;padding:7px 14px;border-radius:999px;font:700 12px/1.2 Lato,system-ui,sans-serif;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none;opacity:0;transition:opacity .3s,transform .3s;white-space:nowrap';
+    document.body.appendChild(b);
   }
+  b.textContent=errore?('⚠ Autosalvataggio non riuscito'+(errore===true?'':': '+errore)):'✓ Autosalvataggio eseguito';
+  b.style.background=errore?'#b91c1c':'#15803d';
+  b.style.opacity='1';b.style.transform='translate(-50%,0)';
   clearTimeout(mostraBannerAutosalvataggio._t);
-  if(typeof aggiornaSyncStatus==='function') aggiornaSyncStatus('');
-  const base=el.style.display==='none'?'':el.textContent;
-  el.innerHTML='';
-  if(base){ el.appendChild(document.createTextNode(base+' ')); }
-  const pill=document.createElement('span');
-  pill.textContent=errore?('⚠ Autosalvataggio non riuscito'+(errore===true?'':': '+errore)):'✓ Autosalvataggio eseguito';
-  pill.style.cssText='display:inline-block;margin-left:4px;padding:2px 9px;border-radius:999px;font-weight:700;font-size:10px;color:#fff;background:'+(errore?'#b91c1c':'#15803d');
-  el.appendChild(pill);
-  el.style.display='';
-  mostraBannerAutosalvataggio._t=setTimeout(()=>{ if(typeof aggiornaSyncStatus==='function') aggiornaSyncStatus(''); else el.style.display='none'; }, errore?6000:3000);
+  mostraBannerAutosalvataggio._t=setTimeout(()=>{b.style.opacity='0';b.style.transform='translate(-50%,10px)';},errore?5000:2000);
 }
 function mostraIndicatore(testo, colore){
   const el = document.getElementById('autosave-indicator');
