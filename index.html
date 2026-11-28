@@ -11669,7 +11669,9 @@ function aggiornaBannerLettura(){
     document.body.appendChild(b);
   }
   const chi=(_lockInfo&&_lockInfo.nome)?_lockInfo.nome:'un altro utente';
-  b.textContent='🔒 '+chi+' sta eseguendo modifiche — sei in sola lettura fino a quando non esce';
+  b.textContent=(_lockInfo&&utenteCorrente&&_lockInfo.utenteId===utenteCorrente.id)
+    ? '🔒 Sei collegato anche da un altro dispositivo, che sta modificando — qui sei in sola lettura finché non esci da lì'
+    : '🔒 '+chi+' sta eseguendo modifiche — sei in sola lettura fino a quando non esce';
   b.style.display='';
 }
 setInterval(()=>{try{aggiornaBannerLettura();}catch(e){}},2000);
@@ -11742,7 +11744,16 @@ function applicaSolaLettura(){
 /* ── Turno di scrittura: un solo utente alla volta può modificare ── */
 const LOCK_FILE='blocco_scrittura.json',LOCK_TTL=45000,LOCK_BEAT=15000;
 const _sessioneId='s_'+_rnd();
-let haScrittura=true,_lockInfo=null,_lockFileId=null,_lockTimer=null;
+const _dispositivoId=(()=>{try{let d=localStorage.getItem('banda_dispositivo');if(!d){d='d_'+_rnd();localStorage.setItem('banda_dispositivo',d);}return d;}catch(e){return 'd_'+_rnd();}})();
+let _ultimoBattito=0;
+// Il turno è "mio" se l'ho preso in questa sessione, oppure è dello stesso utente su questo stesso dispositivo (es. dopo esci/rientra o riapertura)
+function _lockMio(lock,primoAccesso){
+  if(!lock||!lock.sid)return false;
+  if(lock.sid===_sessioneId)return true;
+  if(!utenteCorrente||lock.utenteId!==utenteCorrente.id)return false;
+  return lock.did===_dispositivoId||primoAccesso===true; // stesso utente: al nuovo accesso riprende il turno anche da un altro dispositivo
+}
+let haScrittura=true,_lockInfo=null,_lockFileId=null,_lockTimer=null,_lockOcc=false;
 function _devoCompetere(){
   if(!utenteCorrente)return false;
   if(utenteCorrente.ruolo==='admin')return true;
@@ -11775,12 +11786,12 @@ async function aggiornaLock(primoAccesso){
     await refreshTokenIfNeeded();
     const{lock}=await _leggiLock();
     const scaduto=!lock||!lock.sid||!lock.ts||(Date.now()-lock.ts)>LOCK_TTL;
-    const mio=!!lock&&lock.sid===_sessioneId;
+    const mio=_lockMio(lock,primoAccesso);
     if(mio||scaduto){
-      const nuovo={sid:_sessioneId,utenteId:utenteCorrente.id,nome:utenteCorrente.nome,ts:Date.now()};
+      const nuovo={sid:_sessioneId,did:_dispositivoId,utenteId:utenteCorrente.id,nome:utenteCorrente.nome,ts:Date.now()};
       _lockFileId=null;
-      await _driveScriviJson(LOCK_FILE,nuovo);
-      if(!mio){ // controllo anti-corsa: se due utenti scrivono insieme resta l'ultimo
+      await _driveScriviJson(LOCK_FILE,nuovo);_ultimoBattito=Date.now();
+      if(!(lock&&lock.sid===_sessioneId)){ // controllo anti-corsa: se due utenti scrivono insieme resta l'ultimo
         await new Promise(r=>setTimeout(r,(window.__LOCK_WAIT)||1200));
         const chk=await _leggiLock();
         if(!chk.lock||chk.lock.sid!==_sessioneId){await cambiaStatoScrittura(false,chk.lock);return;}
@@ -11791,18 +11802,29 @@ async function aggiornaLock(primoAccesso){
 }
 function avviaHeartbeatLock(){
   if(_lockTimer)clearInterval(_lockTimer);
-  _lockTimer=setInterval(()=>{if(utenteCorrente&&!document.hidden)aggiornaLock();},(window.__LOCK_BEAT)||LOCK_BEAT);
+  // chi legge controlla ogni 4 secondi se il turno si è liberato; chi scrive rinnova il turno ogni 15 secondi
+  _lockTimer=setInterval(()=>{
+    if(!utenteCorrente||_lockOcc)return;
+    if(haScrittura&&Date.now()-_ultimoBattito<((window.__LOCK_BEAT)||LOCK_BEAT)-1000)return;
+    _lockOcc=true;aggiornaLock().finally(()=>{_lockOcc=false;});
+  },4000);
 }
 async function rilasciaLock(){
   if(_lockTimer){clearInterval(_lockTimer);_lockTimer=null;}
-  const eraMio=haScrittura&&!!utenteCorrente&&_devoCompetere();
-  haScrittura=true;_lockInfo=null;
-  if(!eraMio||!gDriveToken)return;
+  haScrittura=true;_lockInfo=null;_ultimoBattito=0;
+  if(!gDriveToken)return;
   try{
     const{fileId,lock}=await _leggiLock();
-    if(fileId&&lock&&lock.sid===_sessioneId)await _driveScriviJson(LOCK_FILE,{sid:null,ts:0});
+    // si libera il turno se è di questa sessione o di questo dispositivo (anche se il turno era ancora in fase di acquisizione)
+    if(fileId&&lock&&lock.sid&&(lock.sid===_sessioneId||lock.did===_dispositivoId))await _driveScriviJson(LOCK_FILE,{sid:null,ts:0});
   }catch(e){}
 }
+function _rilascioRapidoLock(){
+  if(utenteCorrente&&haScrittura&&_lockFileId&&gDriveToken){
+    try{fetch('https://www.googleapis.com/upload/drive/v3/files/'+_lockFileId+'?uploadType=media',{method:'PATCH',keepalive:true,headers:{'Authorization':'Bearer '+gDriveToken.access_token,'Content-Type':'application/json'},body:JSON.stringify({sid:null,ts:0})});}catch(e){}
+  }
+}
+window.addEventListener('pagehide',_rilascioRapidoLock);
 window.addEventListener('beforeunload',()=>{
   if(utenteCorrente&&haScrittura&&_lockFileId&&gDriveToken){
     try{fetch('https://www.googleapis.com/upload/drive/v3/files/'+_lockFileId+'?uploadType=media',{method:'PATCH',keepalive:true,headers:{'Authorization':'Bearer '+gDriveToken.access_token,'Content-Type':'application/json'},body:JSON.stringify({sid:null,ts:0})});}catch(e){}
@@ -12173,9 +12195,10 @@ async function risvegliaDaBackground(){
   }finally{_risveglio=false;}
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){_nascostoDal=Date.now();return;}
+  if(document.hidden){_nascostoDal=Date.now();try{if(!_inSospeso){_rilascioRapidoLock();_ultimoBattito=0;}}catch(e){}return;}
   const assente=_nascostoDal?Date.now()-_nascostoDal:0;_nascostoDal=0;
   if(assente>15000&&gDriveToken&&utenteCorrente)risvegliaDaBackground();
+  else if(utenteCorrente&&gDriveToken){try{aggiornaLock();}catch(e){}}
 });
 
 </script>
